@@ -283,6 +283,39 @@
             background: rgba(255,255,255,0.25);
         }
 
+        .code-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .btn-whatsapp {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .btn-whatsapp:hover {
+            background: #1da851;
+        }
+
+        .btn-export {
+            background: #2c3e50;
+            color: white;
+            margin-left: auto;
+        }
+
+        .btn-export:hover {
+            background: #1a252f;
+        }
+
         /* Table Styles */
         .filter-bar {
             display: flex;
@@ -603,7 +636,11 @@
                 Diesen Code an <strong>Absender</strong> und <strong>Empf&auml;nger</strong> weitergeben.
                 <br>Der Empf&auml;nger braucht diesen Code, um das Geld abzuholen.
             </div>
-            <button class="btn-copy" onclick="copyCode()">Code kopieren</button>
+            <div class="code-actions">
+                <button class="btn-copy" onclick="copyCode()">Code kopieren</button>
+                <button class="btn-whatsapp" onclick="sendWhatsApp('sender')">WhatsApp an Absender</button>
+                <button class="btn-whatsapp" onclick="sendWhatsApp('receiver')">WhatsApp an Empf&auml;nger</button>
+            </div>
         </div>
     </div>
 
@@ -619,6 +656,7 @@
             <select id="filterDestination" onchange="renderTable()">
                 <option value="alle">Alle Ziele</option>
             </select>
+            <button class="btn btn-export btn-small" onclick="exportCSV()">CSV Export</button>
         </div>
 
         <div class="table-wrapper">
@@ -681,12 +719,30 @@
     // ==================== DATA ====================
     const DEFAULT_FEE_TIERS = [
         { min: 1, max: 50, fee: 3 },
-        { min: 51, max: 100, fee: 5 }
+        { min: 51, max: 100, fee: 5 },
+        { min: 101, max: 150, fee: 8 },
+        { min: 151, max: 200, fee: 10 },
+        { min: 201, max: 250, fee: 13 },
+        { min: 251, max: 300, fee: 15 },
+        { min: 301, max: 350, fee: 18 },
+        { min: 351, max: 400, fee: 20 },
+        { min: 401, max: 450, fee: 23 },
+        { min: 451, max: 500, fee: 25 }
     ];
 
     function loadData() {
         const data = localStorage.getItem('transferTracker');
-        if (data) return JSON.parse(data);
+        if (data) {
+            const parsed = JSON.parse(data);
+            // Migrate: if user still has the old 2-tier default, update to full tiers
+            if (parsed.feeTiers && parsed.feeTiers.length === 2 &&
+                parsed.feeTiers[0].min === 1 && parsed.feeTiers[0].max === 50 &&
+                parsed.feeTiers[1].min === 51 && parsed.feeTiers[1].max === 100) {
+                parsed.feeTiers = DEFAULT_FEE_TIERS;
+                localStorage.setItem('transferTracker', JSON.stringify(parsed));
+            }
+            return parsed;
+        }
         return {
             transfers: [],
             feeTiers: DEFAULT_FEE_TIERS
@@ -776,6 +832,7 @@
 
         appData.transfers.unshift(transfer);
         saveData(appData);
+        lastTransfer = transfer;
 
         // Show code
         document.getElementById('generatedCode').textContent = code;
@@ -976,6 +1033,106 @@
         appData.feeTiers.push({ min, max, fee });
         saveData(appData);
         renderFeeTable();
+    }
+
+    // ==================== WHATSAPP ====================
+    let lastTransfer = null;
+
+    function sendWhatsApp(target) {
+        if (!lastTransfer) return;
+        const t = lastTransfer;
+        const phone = target === 'sender' ? t.senderPhone : t.receiverPhone;
+        const name = target === 'sender' ? t.sender : t.receiver;
+        const otherName = target === 'sender' ? t.receiver : t.sender;
+
+        let message;
+        if (target === 'sender') {
+            message = `Hallo ${name},\n\ndein Geldtransfer wurde erstellt.\n\n`
+                + `Empf\u00e4nger: ${otherName}\n`
+                + `Betrag: ${formatCurrency(t.amount)}\n`
+                + `Geb\u00fchr: ${formatCurrency(t.fee)}\n`
+                + `Gesamt: ${formatCurrency(t.amount + t.fee)}\n\n`
+                + `Dein Best\u00e4tigungscode: ${t.code}\n\n`
+                + `Bitte diesen Code aufbewahren.`;
+        } else {
+            message = `Hello ${name},\n\n`
+                + `a money transfer has been sent to you.\n\n`
+                + `From: ${otherName}\n`
+                + `Amount: ${formatCurrency(t.amount)}\n\n`
+                + `Your confirmation code: ${t.code}\n\n`
+                + `Please show this code when collecting the money.`;
+        }
+
+        const encoded = encodeURIComponent(message);
+        // Clean phone number: remove spaces, dashes
+        const cleanPhone = phone ? phone.replace(/[\s\-()]/g, '') : '';
+
+        if (cleanPhone) {
+            // If phone starts with 0, assume German number
+            let intlPhone = cleanPhone;
+            if (intlPhone.startsWith('00')) {
+                intlPhone = '+' + intlPhone.substring(2);
+            } else if (intlPhone.startsWith('0')) {
+                intlPhone = '+49' + intlPhone.substring(1);
+            }
+            // Remove the + for wa.me URL
+            const waPhone = intlPhone.replace('+', '');
+            window.open(`https://wa.me/${waPhone}?text=${encoded}`, '_blank');
+        } else {
+            // No phone number - open WhatsApp with just the text
+            window.open(`https://wa.me/?text=${encoded}`, '_blank');
+        }
+    }
+
+    // ==================== CSV EXPORT ====================
+    function exportCSV() {
+        if (appData.transfers.length === 0) {
+            return alert('Keine Transfers zum Exportieren vorhanden.');
+        }
+
+        const headers = ['Datum', 'Uhrzeit', 'Code', 'Absender', 'Tel. Absender', 'Empf\u00e4nger', 'Tel. Empf\u00e4nger', 'Zielland', 'Betrag (EUR)', 'Geb\u00fchr (EUR)', 'Gesamt (EUR)', 'Zahlung'];
+        const rows = appData.transfers.map(t => {
+            const date = new Date(t.createdAt);
+            return [
+                date.toLocaleDateString('de-DE'),
+                date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+                t.code,
+                t.sender,
+                t.senderPhone || '',
+                t.receiver,
+                t.receiverPhone || '',
+                t.destination,
+                t.amount.toFixed(2).replace('.', ','),
+                t.fee.toFixed(2).replace('.', ','),
+                (t.amount + t.fee).toFixed(2).replace('.', ','),
+                t.paid ? 'Bezahlt' : 'Offen'
+            ];
+        });
+
+        // Add summary row
+        const totalAmount = appData.transfers.reduce((s, t) => s + t.amount, 0);
+        const totalFees = appData.transfers.reduce((s, t) => s + t.fee, 0);
+        rows.push([]);
+        rows.push(['', '', '', '', '', '', '', 'SUMME',
+            totalAmount.toFixed(2).replace('.', ','),
+            totalFees.toFixed(2).replace('.', ','),
+            (totalAmount + totalFees).toFixed(2).replace('.', ','),
+            ''
+        ]);
+
+        // Build CSV with BOM for Excel compatibility
+        const csvContent = '\uFEFF' + [headers, ...rows]
+            .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+            .join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const today = new Date().toISOString().slice(0, 10);
+        link.href = url;
+        link.download = `transfers_${today}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
     }
 
     // ==================== TABS ====================
