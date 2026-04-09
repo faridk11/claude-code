@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geldtransfer-Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .header .stats {
+            display: flex;
+            gap: 25px;
+            font-size: 0.9rem;
+        }
+
+        .header .stat-item {
+            text-align: center;
+        }
+
+        .header .stat-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #4ecca3;
+        }
+
+        .header .stat-label {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 24px;
+            border: none;
+            background: white;
+            color: #666;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: #1a1a2e;
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: #e8e8e8;
+        }
+
+        .panel {
+            display: none;
+            background: white;
+            border-radius: 0 12px 12px 12px;
+            padding: 30px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        /* Form Styles */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input, .form-group select {
+            padding: 12px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #4ecca3;
+        }
+
+        .fee-display {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            text-align: center;
+        }
+
+        .fee-item {
+            padding: 10px;
+        }
+
+        .fee-item .label {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .fee-item .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-top: 4px;
+        }
+
+        .fee-item .value.green {
+            color: #4ecca3;
+        }
+
+        .btn {
+            padding: 14px 32px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4ecca3, #38b88a);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(78,204,163,0.4);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+            padding: 6px 14px;
+            font-size: 0.8rem;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-confirm {
+            background: #4ecca3;
+            color: white;
+            padding: 6px 14px;
+            font-size: 0.8rem;
+        }
+
+        .btn-confirm:hover {
+            background: #38b88a;
+        }
+
+        .btn-small {
+            padding: 6px 14px;
+            font-size: 0.8rem;
+        }
+
+        .form-actions {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        /* Code Display */
+        .code-result {
+            display: none;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .code-result.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .code-result h3 {
+            margin-bottom: 10px;
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+
+        .code-result .code {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: 6px;
+            color: #4ecca3;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+        }
+
+        .code-result .code-info {
+            font-size: 0.85rem;
+            opacity: 0.7;
+        }
+
+        .code-result .btn-copy {
+            margin-top: 15px;
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .code-result .btn-copy:hover {
+            background: rgba(255,255,255,0.25);
+        }
+
+        /* Table Styles */
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-bar input, .filter-bar select {
+            padding: 8px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .filter-bar input:focus, .filter-bar select:focus {
+            outline: none;
+            border-color: #4ecca3;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        thead th {
+            background: #f8f9fa;
+            padding: 12px 14px;
+            text-align: left;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e0e0e0;
+            white-space: nowrap;
+        }
+
+        tbody td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
+        }
+
+        tbody tr:hover {
+            background: #f8fffe;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .status-offen {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-bezahlt {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .code-cell {
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+            color: #1a1a2e;
+            letter-spacing: 1px;
+        }
+
+        .amount-cell {
+            font-weight: 600;
+        }
+
+        .fee-cell {
+            color: #4ecca3;
+            font-weight: 600;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 1rem;
+        }
+
+        /* Fee Table */
+        .fee-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .fee-table th, .fee-table td {
+            padding: 10px 14px;
+            border: 1px solid #e0e0e0;
+            text-align: center;
+        }
+
+        .fee-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .fee-table .editable {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .fee-table .editable:hover {
+            background: #e8f5e9;
+        }
+
+        .fee-table input {
+            width: 80px;
+            padding: 6px;
+            border: 2px solid #4ecca3;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .add-tier-btn {
+            margin-top: 10px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .fee-display {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .header .stats {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .tabs {
+                overflow-x: auto;
+            }
+
+            .filter-bar {
+                flex-direction: column;
+            }
+
+            .filter-bar input, .filter-bar select {
+                width: 100%;
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal h3 {
+            margin-bottom: 15px;
+        }
+
+        .modal p {
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .modal .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .modal .btn-cancel {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        /* Print styles */
+        @media print {
+            .header .stats, .tabs, .filter-bar, .btn, .form-actions, .no-print {
+                display: none !important;
+            }
+            .panel { box-shadow: none; }
+            body { background: white; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Geldtransfer-Tracker</h1>
+    <div class="stats">
+        <div class="stat-item">
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">Transfers gesamt</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="stat-open">0</div>
+            <div class="stat-label">Zahlung offen</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="stat-revenue">0,00 &euro;</div>
+            <div class="stat-label">Einnahmen (Geb&uuml;hren)</div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('new')">Neuer Transfer</button>
+        <button class="tab" onclick="showTab('list')">Alle Transfers</button>
+        <button class="tab" onclick="showTab('fees')">Geb&uuml;hrenstruktur</button>
+    </div>
+
+    <!-- New Transfer Panel -->
+    <div class="panel active" id="panel-new">
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Absender (Name)</label>
+                <input type="text" id="sender" placeholder="z.B. Max Mustermann">
+            </div>
+            <div class="form-group">
+                <label>Telefon Absender (optional)</label>
+                <input type="text" id="senderPhone" placeholder="z.B. 0176 12345678">
+            </div>
+            <div class="form-group">
+                <label>Empf&auml;nger (Name)</label>
+                <input type="text" id="receiver" placeholder="z.B. Kwame Asante">
+            </div>
+            <div class="form-group">
+                <label>Telefon Empf&auml;nger (optional)</label>
+                <input type="text" id="receiverPhone" placeholder="z.B. +233 ...">
+            </div>
+            <div class="form-group">
+                <label>Zielland</label>
+                <select id="destination">
+                    <option value="Ghana">Ghana</option>
+                    <option value="Nigeria">Nigeria</option>
+                    <option value="Senegal">Senegal</option>
+                    <option value="Kamerun">Kamerun</option>
+                    <option value="Togo">Togo</option>
+                    <option value="Anderes">Anderes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Betrag (&euro;)</label>
+                <input type="number" id="amount" placeholder="0,00" min="1" step="0.01" oninput="updateFeePreview()">
+            </div>
+        </div>
+
+        <div class="fee-display">
+            <div class="fee-item">
+                <div class="label">Betrag</div>
+                <div class="value" id="preview-amount">0,00 &euro;</div>
+            </div>
+            <div class="fee-item">
+                <div class="label">Geb&uuml;hr</div>
+                <div class="value green" id="preview-fee">0,00 &euro;</div>
+            </div>
+            <div class="fee-item">
+                <div class="label">Gesamt (Kunde zahlt)</div>
+                <div class="value" id="preview-total">0,00 &euro;</div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-primary" onclick="createTransfer()">Transfer erstellen</button>
+        </div>
+
+        <div class="code-result" id="codeResult">
+            <h3>Bestätigungscode</h3>
+            <div class="code" id="generatedCode"></div>
+            <div class="code-info">
+                Diesen Code an <strong>Absender</strong> und <strong>Empf&auml;nger</strong> weitergeben.
+                <br>Der Empf&auml;nger braucht diesen Code, um das Geld abzuholen.
+            </div>
+            <button class="btn-copy" onclick="copyCode()">Code kopieren</button>
+        </div>
+    </div>
+
+    <!-- Transfer List Panel -->
+    <div class="panel" id="panel-list">
+        <div class="filter-bar">
+            <input type="text" id="searchInput" placeholder="Suche (Name, Code...)" oninput="renderTable()">
+            <select id="filterStatus" onchange="renderTable()">
+                <option value="alle">Alle Status</option>
+                <option value="offen">Zahlung offen</option>
+                <option value="bezahlt">Bezahlt</option>
+            </select>
+            <select id="filterDestination" onchange="renderTable()">
+                <option value="alle">Alle Ziele</option>
+            </select>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Code</th>
+                        <th>Absender</th>
+                        <th>Empf&auml;nger</th>
+                        <th>Ziel</th>
+                        <th>Betrag</th>
+                        <th>Geb&uuml;hr</th>
+                        <th>Zahlung</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody id="transferTableBody">
+                </tbody>
+            </table>
+            <div class="no-data" id="noData" style="display:none;">Noch keine Transfers vorhanden.</div>
+        </div>
+    </div>
+
+    <!-- Fee Structure Panel -->
+    <div class="panel" id="panel-fees">
+        <h3 style="margin-bottom: 15px;">Geb&uuml;hrenstruktur bearbeiten</h3>
+        <p style="color: #666; margin-bottom: 20px; font-size: 0.9rem;">
+            Klicke auf einen Geb&uuml;hrenwert, um ihn zu &auml;ndern. Du kannst auch neue Stufen hinzuf&uuml;gen.
+        </p>
+        <table class="fee-table" id="feeTable">
+            <thead>
+                <tr>
+                    <th>Von (&euro;)</th>
+                    <th>Bis (&euro;)</th>
+                    <th>Geb&uuml;hr (&euro;)</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="feeTableBody">
+            </tbody>
+        </table>
+        <button class="btn btn-primary btn-small add-tier-btn" onclick="addFeeTier()">+ Neue Stufe hinzuf&uuml;gen</button>
+    </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+        <h3 id="modalTitle">Zahlung best&auml;tigen</h3>
+        <p id="modalText">M&ouml;chtest du best&auml;tigen, dass du das Geld vom Absender erhalten hast?</p>
+        <div class="modal-actions">
+            <button class="btn btn-cancel" onclick="closeModal()">Abbrechen</button>
+            <button class="btn btn-confirm" id="modalConfirmBtn" onclick="">Best&auml;tigen</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==================== DATA ====================
+    const DEFAULT_FEE_TIERS = [
+        { min: 1, max: 50, fee: 3 },
+        { min: 51, max: 100, fee: 5 }
+    ];
+
+    function loadData() {
+        const data = localStorage.getItem('transferTracker');
+        if (data) return JSON.parse(data);
+        return {
+            transfers: [],
+            feeTiers: DEFAULT_FEE_TIERS
+        };
+    }
+
+    function saveData(data) {
+        localStorage.setItem('transferTracker', JSON.stringify(data));
+    }
+
+    let appData = loadData();
+
+    // ==================== CODE GENERATION ====================
+    function generateCode() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code;
+        const existingCodes = new Set(appData.transfers.map(t => t.code));
+        do {
+            code = 'MT-';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+        } while (existingCodes.has(code));
+        return code;
+    }
+
+    // ==================== FEE CALCULATION ====================
+    function calculateFee(amount) {
+        const tiers = appData.feeTiers.sort((a, b) => a.min - b.min);
+        for (const tier of tiers) {
+            if (amount >= tier.min && amount <= tier.max) {
+                return tier.fee;
+            }
+        }
+        // If amount exceeds all tiers, use the highest tier's fee
+        if (tiers.length > 0 && amount > tiers[tiers.length - 1].max) {
+            return tiers[tiers.length - 1].fee;
+        }
+        return 0;
+    }
+
+    function formatCurrency(val) {
+        return val.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20AC';
+    }
+
+    // ==================== FEE PREVIEW ====================
+    function updateFeePreview() {
+        const amount = parseFloat(document.getElementById('amount').value) || 0;
+        const fee = calculateFee(amount);
+        document.getElementById('preview-amount').textContent = formatCurrency(amount);
+        document.getElementById('preview-fee').textContent = formatCurrency(fee);
+        document.getElementById('preview-total').textContent = formatCurrency(amount + fee);
+    }
+
+    // ==================== CREATE TRANSFER ====================
+    function createTransfer() {
+        const sender = document.getElementById('sender').value.trim();
+        const senderPhone = document.getElementById('senderPhone').value.trim();
+        const receiver = document.getElementById('receiver').value.trim();
+        const receiverPhone = document.getElementById('receiverPhone').value.trim();
+        const destination = document.getElementById('destination').value;
+        const amount = parseFloat(document.getElementById('amount').value);
+
+        if (!sender) return alert('Bitte Absender-Name eingeben.');
+        if (!receiver) return alert('Bitte Empf\u00e4nger-Name eingeben.');
+        if (!amount || amount <= 0) return alert('Bitte g\u00fcltigen Betrag eingeben.');
+
+        const fee = calculateFee(amount);
+        if (fee === 0) {
+            if (!confirm('F\u00fcr diesen Betrag ist keine Geb\u00fchr hinterlegt. Trotzdem fortfahren?')) return;
+        }
+
+        const code = generateCode();
+        const transfer = {
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            code,
+            sender,
+            senderPhone,
+            receiver,
+            receiverPhone,
+            destination,
+            amount,
+            fee,
+            paid: false,
+            createdAt: new Date().toISOString()
+        };
+
+        appData.transfers.unshift(transfer);
+        saveData(appData);
+
+        // Show code
+        document.getElementById('generatedCode').textContent = code;
+        const codeResult = document.getElementById('codeResult');
+        codeResult.classList.add('show');
+
+        // Reset form
+        document.getElementById('sender').value = '';
+        document.getElementById('senderPhone').value = '';
+        document.getElementById('receiver').value = '';
+        document.getElementById('receiverPhone').value = '';
+        document.getElementById('amount').value = '';
+        updateFeePreview();
+        updateStats();
+    }
+
+    function copyCode() {
+        const code = document.getElementById('generatedCode').textContent;
+        navigator.clipboard.writeText(code).then(() => {
+            const btn = document.querySelector('.btn-copy');
+            btn.textContent = 'Kopiert!';
+            setTimeout(() => btn.textContent = 'Code kopieren', 2000);
+        });
+    }
+
+    // ==================== TABLE ====================
+    function renderTable() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const statusFilter = document.getElementById('filterStatus').value;
+        const destFilter = document.getElementById('filterDestination').value;
+
+        let transfers = appData.transfers;
+
+        if (search) {
+            transfers = transfers.filter(t =>
+                t.sender.toLowerCase().includes(search) ||
+                t.receiver.toLowerCase().includes(search) ||
+                t.code.toLowerCase().includes(search) ||
+                (t.senderPhone && t.senderPhone.includes(search)) ||
+                (t.receiverPhone && t.receiverPhone.includes(search))
+            );
+        }
+
+        if (statusFilter !== 'alle') {
+            transfers = transfers.filter(t =>
+                statusFilter === 'offen' ? !t.paid : t.paid
+            );
+        }
+
+        if (destFilter !== 'alle') {
+            transfers = transfers.filter(t => t.destination === destFilter);
+        }
+
+        const tbody = document.getElementById('transferTableBody');
+        const noData = document.getElementById('noData');
+
+        if (transfers.length === 0) {
+            tbody.innerHTML = '';
+            noData.style.display = 'block';
+            return;
+        }
+
+        noData.style.display = 'none';
+        tbody.innerHTML = transfers.map(t => {
+            const date = new Date(t.createdAt);
+            const dateStr = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const timeStr = date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+            return `<tr>
+                <td>${dateStr}<br><small style="color:#999">${timeStr}</small></td>
+                <td class="code-cell">${t.code}</td>
+                <td>${t.sender}${t.senderPhone ? '<br><small style="color:#999">' + t.senderPhone + '</small>' : ''}</td>
+                <td>${t.receiver}${t.receiverPhone ? '<br><small style="color:#999">' + t.receiverPhone + '</small>' : ''}</td>
+                <td>${t.destination}</td>
+                <td class="amount-cell">${formatCurrency(t.amount)}</td>
+                <td class="fee-cell">${formatCurrency(t.fee)}</td>
+                <td>
+                    <span class="status-badge ${t.paid ? 'status-bezahlt' : 'status-offen'}">
+                        ${t.paid ? 'Bezahlt' : 'Offen'}
+                    </span>
+                </td>
+                <td>
+                    ${!t.paid ? `<button class="btn btn-confirm btn-small" onclick="confirmPayment('${t.id}')">Bezahlt</button>` : ''}
+                    <button class="btn btn-danger btn-small" onclick="deleteTransfer('${t.id}')" style="margin-top:4px;">L&ouml;schen</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ==================== PAYMENT CONFIRMATION ====================
+    function confirmPayment(id) {
+        const transfer = appData.transfers.find(t => t.id === id);
+        if (!transfer) return;
+
+        document.getElementById('modalTitle').textContent = 'Zahlung best\u00e4tigen';
+        document.getElementById('modalText').innerHTML =
+            `Best\u00e4tigen, dass <strong>${transfer.sender}</strong> dir <strong>${formatCurrency(transfer.amount + transfer.fee)}</strong> gegeben hat?<br><small>Transfer-Code: ${transfer.code}</small>`;
+        document.getElementById('modalConfirmBtn').onclick = function () {
+            transfer.paid = true;
+            saveData(appData);
+            renderTable();
+            updateStats();
+            closeModal();
+        };
+        document.getElementById('confirmModal').classList.add('show');
+    }
+
+    function deleteTransfer(id) {
+        const transfer = appData.transfers.find(t => t.id === id);
+        if (!transfer) return;
+
+        document.getElementById('modalTitle').textContent = 'Transfer l\u00f6schen';
+        document.getElementById('modalText').innerHTML =
+            `M\u00f6chtest du den Transfer <strong>${transfer.code}</strong> wirklich l\u00f6schen?`;
+        document.getElementById('modalConfirmBtn').onclick = function () {
+            appData.transfers = appData.transfers.filter(t => t.id !== id);
+            saveData(appData);
+            renderTable();
+            updateStats();
+            closeModal();
+        };
+        document.getElementById('modalConfirmBtn').textContent = 'L\u00f6schen';
+        document.getElementById('modalConfirmBtn').style.background = '#e74c3c';
+        document.getElementById('confirmModal').classList.add('show');
+    }
+
+    function closeModal() {
+        document.getElementById('confirmModal').classList.remove('show');
+        document.getElementById('modalConfirmBtn').textContent = 'Best\u00e4tigen';
+        document.getElementById('modalConfirmBtn').style.background = '';
+    }
+
+    // ==================== STATS ====================
+    function updateStats() {
+        const total = appData.transfers.length;
+        const open = appData.transfers.filter(t => !t.paid).length;
+        const revenue = appData.transfers.reduce((sum, t) => sum + t.fee, 0);
+
+        document.getElementById('stat-total').textContent = total;
+        document.getElementById('stat-open').textContent = open;
+        document.getElementById('stat-revenue').textContent = formatCurrency(revenue);
+
+        // Update destination filter
+        const destinations = [...new Set(appData.transfers.map(t => t.destination))];
+        const filterDest = document.getElementById('filterDestination');
+        const currentVal = filterDest.value;
+        filterDest.innerHTML = '<option value="alle">Alle Ziele</option>' +
+            destinations.map(d => `<option value="${d}"${d === currentVal ? ' selected' : ''}>${d}</option>`).join('');
+    }
+
+    // ==================== FEE TABLE ====================
+    function renderFeeTable() {
+        const tbody = document.getElementById('feeTableBody');
+        const tiers = appData.feeTiers.sort((a, b) => a.min - b.min);
+
+        tbody.innerHTML = tiers.map((tier, i) => `
+            <tr>
+                <td>${tier.min}</td>
+                <td>${tier.max}</td>
+                <td class="editable" onclick="editFee(${i}, this)">${formatCurrency(tier.fee)}</td>
+                <td><button class="btn btn-danger btn-small" onclick="removeFeeTier(${i})">Entfernen</button></td>
+            </tr>
+        `).join('');
+    }
+
+    function editFee(index, cell) {
+        const currentFee = appData.feeTiers[index].fee;
+        cell.innerHTML = `<input type="number" value="${currentFee}" min="0" step="0.5"
+            onblur="saveFee(${index}, this.value)"
+            onkeydown="if(event.key==='Enter'){saveFee(${index}, this.value)}"
+            autofocus>`;
+        cell.querySelector('input').focus();
+    }
+
+    function saveFee(index, value) {
+        const fee = parseFloat(value);
+        if (!isNaN(fee) && fee >= 0) {
+            appData.feeTiers[index].fee = fee;
+            saveData(appData);
+        }
+        renderFeeTable();
+    }
+
+    function removeFeeTier(index) {
+        appData.feeTiers.splice(index, 1);
+        saveData(appData);
+        renderFeeTable();
+    }
+
+    function addFeeTier() {
+        const tiers = appData.feeTiers.sort((a, b) => a.min - b.min);
+        const lastMax = tiers.length > 0 ? tiers[tiers.length - 1].max : 0;
+
+        const min = lastMax + 1;
+        const max = min + 49;
+        const fee = tiers.length > 0 ? tiers[tiers.length - 1].fee + 2 : 3;
+
+        appData.feeTiers.push({ min, max, fee });
+        saveData(appData);
+        renderFeeTable();
+    }
+
+    // ==================== TABS ====================
+    function showTab(name) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+
+        event.target.classList.add('active');
+        document.getElementById('panel-' + name).classList.add('active');
+
+        if (name === 'list') renderTable();
+        if (name === 'fees') renderFeeTable();
+    }
+
+    // ==================== INIT ====================
+    updateStats();
+    renderFeeTable();
+</script>
+
+</body>
+</html>
